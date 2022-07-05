@@ -148,22 +148,22 @@ bool Communication::traiterTrame(TypeTrame typeTrame, QString trame)
 }
 
 /**
- * @fn Communication::estConnecte() const
+ * @fn Communication::estPreteAEtreConnecte() const
  * @brief Verifie si la cafetière est connectée
  * @details Verifie si le bluetooth est disponible et si la socket est ouverte
  */
 
-bool Communication::estConnecte() const
+bool Communication::estPreteAEtreConnecte() const
 {
-    if(!estBluetoothDisponible())
+    if(!estBluetoothDisponible() || socketBluetoothPikawa == nullptr ||
+       !socketBluetoothPikawa->isOpen())
+    {
         return false;
-    if(socketBluetoothPikawa == nullptr)
-        return false;
-    qDebug() << Q_FUNC_INFO << "isOpen" << socketBluetoothPikawa->isOpen()
-             << "connecte" << connecte;
-    if(!socketBluetoothPikawa->isOpen())
-        return false;
-    return connecte;
+    }
+    else
+    {
+        return true;
+    }
 }
 
 bool Communication::estCafetiereDetectee() const
@@ -200,6 +200,7 @@ void Communication::activerLaDecouverte()
         agentDecouvreur = new QBluetoothDeviceDiscoveryAgent(this);
         if(agentDecouvreur != nullptr)
         {
+            effacerLeCacheBluetooth();
             connect(agentDecouvreur,
                     SIGNAL(deviceDiscovered(QBluetoothDeviceInfo)),
                     this,
@@ -223,11 +224,22 @@ void Communication::desactiverLaDecouverte()
     }
 }
 
+void Communication::effacerLeCacheBluetooth()
+{
+    qDebug() << Q_FUNC_INFO;
+    QProcess* process  = new QProcess;
+    QString   commande = "bluetoothctl remove " + QString(ADRESSE_MAC_PIKAWA);
+    process->start(commande);
+    process->waitForFinished();
+    QString resulat = process->readAllStandardOutput();
+    qDebug() << Q_FUNC_INFO << resulat;
+}
+
 /**
  * @fn Communication::decouvrirCafetiere(
   const QBluetoothDeviceInfo& appareilBluetooth)
- * @brief Stockage des caractéristiques du bluetooth de la cafetiere si elle est
- découverte
+ * @brief Stockage des caractéristiques du bluetooth de la cafetiere si elle
+ est découverte
  * @details Envoie de signal si la recherche est terminée
  */
 void Communication::decouvrirCafetiere(
@@ -237,12 +249,8 @@ void Communication::decouvrirCafetiere(
              << '[' << appareilBluetooth.address().toString() << ']' << "rssi"
              << appareilBluetooth.rssi();
 
-    if(appareilBluetooth.name().contains(PREFIXE_NOM_CAFETIERE) /*&&
-       appareilBluetooth.rssi() != 0*/)
+    if(appareilBluetooth.name().contains(PREFIXE_NOM_CAFETIERE))
     {
-        /**
-         * @see systemctl restart bluetooth
-         */
         qDebug() << Q_FUNC_INFO << "machine à café pikawa détectée"
                  << appareilBluetooth.name() << '['
                  << appareilBluetooth.address().toString() << ']';
@@ -252,6 +260,7 @@ void Communication::decouvrirCafetiere(
         emit rechercheTerminee(pikawaDetecte);
         emit cafetiereDetectee(appareilBluetooth.name(),
                                appareilBluetooth.address().toString());
+        connecter();
     }
 }
 
@@ -264,14 +273,14 @@ void Communication::terminerRecherche()
 /**
  * @fn Communication::connecter()
  * @brief Slot de connexion
- * @details connexion des "signals" de l'objet socketBluetoothPikawa au "slots"
+ * @details connexion des "signals" de l'objet socketBluetoothPikawa au
+ * "slots"
  */
-
 void Communication::connecter()
 {
     qDebug() << Q_FUNC_INFO;
 
-    if(!estConnecte())
+    if(!estPreteAEtreConnecte())
     {
         if(pikawaDetecte)
         {
@@ -312,7 +321,7 @@ void Communication::connecter()
         else
             qDebug() << Q_FUNC_INFO << "erreur pikawa non détecté";
     }
-    qDebug() << Q_FUNC_INFO << estConnecte();
+    qDebug() << Q_FUNC_INFO << estPreteAEtreConnecte();
 }
 
 /**
@@ -354,8 +363,8 @@ void Communication::recupererEtatDeconnexion()
 /**
  * @fn Communication::recevoir()
  * @brief Receptionne les trames
- * @details Slot appelé à chaque fois que l'objet socketBluetoothPikawa envoie
- * le signal readyRead()
+ * @details Slot appelé à chaque fois que l'objet socketBluetoothPikawa
+ * envoie le signal readyRead()
  */
 void Communication::recevoir()
 {
@@ -402,4 +411,9 @@ void Communication::envoyerTramePreparation(int nomCafe, int longueur)
     envoyerTrame(QString(DEBUT_TRAME_PREPARATION) + QString::number(nomCafe) +
                  QString(DELIMITEUR) + QString::number(longueur + 1) +
                  QString(DELIMITEUR) + QString(FIN_TRAME));
+}
+
+bool Communication::estConnecte() const
+{
+    return connecte;
 }

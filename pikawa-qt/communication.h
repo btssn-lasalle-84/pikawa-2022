@@ -17,7 +17,8 @@
  * @def PREFIXE_NOM_CAFETIERE
  * @brief L'appareil Bluetooth d'une cafetière doit contenir ce préfixe de nom
  */
-#define PREFIXE_NOM_CAFETIERE "PIKAWA"
+#define PREFIXE_NOM_CAFETIERE "PIKAWA-2"
+#define ADRESSE_MAC_PIKAWA    "30:AE:A4:23:D6:7E"
 
 /**
  * @def TEST_TRAMES
@@ -56,10 +57,13 @@ class Communication : public QObject
     TypeTrame extraireTypeTrame(QString trame);
     bool      traiterTrame(TypeTrame typeTrame, QString trame);
 
+    void effacerLeCacheBluetooth();
+
   public:
     Communication(QObject* parent = nullptr);
     ~Communication();
 
+    bool estPreteAEtreConnecte() const;
     bool estConnecte() const;
     bool estCafetiereDetectee() const;
     void envoyerTrame(QString trame);
